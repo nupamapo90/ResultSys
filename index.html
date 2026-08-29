@@ -25,7 +25,12 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, -apple-system, sans-serif; background-color: var(--bg); color: var(--text); line-height: 1.5; padding: 20px; max-width: 1400px; margin: 0 auto; }
-    h1 { font-size: 1.5rem; margin-bottom: 16px; color: var(--primary); }
+    
+    /* ヘッダーエリアのスタイル追加 */
+    .app-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+    .app-header h1 { font-size: 1.5rem; color: var(--primary); margin-bottom: 0; }
+    .readme-link { font-size: 0.9rem; font-weight: bold; color: var(--primary); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--card-bg); transition: all 0.2s; }
+    .readme-link:hover { background: #e0f2fe; border-color: #38bdf8; }
 
     .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     .card-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 12px; border-bottom: 2px solid var(--primary); padding-bottom: 4px; }
@@ -113,7 +118,11 @@
 </head>
 <body>
 
-  <h1>🏊 水泳記録会 タイム計測システム</h1>
+  <!-- ヘッダー部分に概要リンクを追加 -->
+  <header class="app-header">
+    <h1>🏊 水泳記録会 タイム計測システム</h1>
+    <a href="README.md" target="_blank" class="readme-link">📄 概要 (README)</a>
+  </header>
 
   <div class="card">
     <div class="card-title">競技情報設定</div>
@@ -706,14 +715,11 @@
       });
     }
 
-    /* --- 進出判定および順位割り当てロジック関数 (改修版) --- */
     function evaluateAdvancement(entries) {
       let resultMap = new Map();
 
-      // 有効なタイム記録を持つエントリーのみソート
       let validEntries = entries.filter(e => e.status === 'OK').sort((a,b) => a.totalMs - b.totalMs);
       
-      // タイムごとにグループ化して同着判定
       let timeGroups = [];
       validEntries.forEach(item => {
         let lastGroup = timeGroups[timeGroups.length - 1];
@@ -735,7 +741,6 @@
           let advanceInfo = '';
           let badgeClass = '';
 
-          // 予選イベントの場合のみ進出権/スイムオフのバッジを判定
           if (item.roundType === '予選') {
             if (endRank <= 8) {
               advanceInfo = '決勝進出';
@@ -826,7 +831,6 @@
       let groupedEvents = {};
 
       historyData.forEach((row, rowIdx) => {
-        // ラウンド種別ごとに分けてランキング集計
         const eventKey = `Prog${row.progNo}_${row.roundType}_${row.gender}_${row.distance}_${row.style}`;
         if (!groupedEvents[eventKey]) groupedEvents[eventKey] = [];
 
