@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>水泳記録会 リザルトシステム (全種別順位表示対応)</title>
+  <style>
+    :root {
+      --primary: #0284c7;
+      --primary-hover: #0369a1;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --success: #16a34a;
+      --running: #dc2626;
+      --dns-color: #d97706;
+      --dsq-color: #dc2626;
+      --badge-final: #15803d;
+      --badge-bfinal: #0369a1;
+      --badge-swimoff: #c026d3;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background-color: var(--bg); color: var(--text); line-height: 1.5; padding: 20px; max-width: 1400px; margin: 0 auto; }
+    h1 { font-size: 1.5rem; margin-bottom: 16px; color: var(--primary); }
+
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .card-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 12px; border-bottom: 2px solid var(--primary); padding-bottom: 4px; }
+
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
+    .form-group { display: flex; flex-direction: column; }
+    .form-group label { font-size: 0.85rem; font-weight: bold; margin-bottom: 4px; color: var(--text-muted); }
+    .form-group input, .form-group select { padding: 8px 12px; border: 1px solid var(--border); border-radius: 4px; font-size: 0.95rem; }
+
+    .timer-container { text-align: center; padding: 10px 0; }
+    .timer-display { font-family: monospace; font-size: 3.5rem; font-weight: bold; color: var(--text); letter-spacing: 2px; }
+
+    .controls { display: flex; gap: 12px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+    .btn { padding: 10px 20px; font-size: 1rem; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: background 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-start { background: var(--success); color: white; }
+    .btn-start:hover { background: #15803d; }
+    .btn-confirm { background: var(--primary); color: white; }
+    .btn-confirm:hover { background: var(--primary-hover); }
+    .btn-reset { background: #64748b; color: white; }
+    .btn-reset:hover { background: #475569; }
+    .btn-danger { background: #ef4444; color: white; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-tab { background: #e2e8f0; color: var(--text); }
+    .btn-tab.active { background: var(--primary); color: white; }
+
+    kbd { background: rgba(0,0,0,0.15); border-radius: 3px; padding: 2px 6px; font-size: 0.8rem; font-family: monospace; }
+    .shortcut-info { font-size: 0.85rem; color: var(--text-muted); text-align: center; margin-top: 8px; }
+
+    .lanes-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+    .lane-box { border: 1px solid var(--border); border-radius: 6px; padding: 12px; background: #fafafa; display: flex; flex-direction: column; align-items: center; position: relative; }
+    .lane-box.finished { background: #e0f2fe; border-color: #38bdf8; }
+    .lane-box.status-dns { background: #fef3c7; border-color: #f59e0b; }
+    .lane-box.status-dsq { background: #fee2e2; border-color: #f87171; }
+
+    .lane-header { display: flex; justify-content: space-between; width: 100%; margin-bottom: 6px; align-items: center; }
+    .lane-number { font-weight: bold; font-size: 1.1rem; }
+    .lane-progress { font-size: 0.8rem; color: var(--text-muted); font-weight: bold; }
+
+    .lane-time { font-family: monospace; font-size: 1.4rem; font-weight: bold; margin: 4px 0; }
+    .lane-time.status-dns-text { color: var(--dns-color); }
+    .lane-time.status-dsq-text { color: var(--dsq-color); }
+
+    .lap-history-mini { width: 100%; max-height: 90px; overflow-y: auto; background: #fff; border: 1px solid var(--border); border-radius: 4px; padding: 4px; font-size: 0.75rem; font-family: monospace; margin-bottom: 8px; }
+
+    .btn-lane { width: 100%; padding: 8px; background: #e2e8f0; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 6px; }
+    .btn-lane:hover { background: #cbd5e1; }
+
+    .lane-action-btns { display: flex; gap: 4px; width: 100%; margin-bottom: 6px; }
+    .btn-sub { flex: 1; padding: 4px; font-size: 0.75rem; border: 1px solid var(--border); background: white; border-radius: 4px; cursor: pointer; font-weight: bold; }
+    .btn-sub:hover { background: #f1f5f9; }
+
+    .lane-status-btns { display: flex; gap: 4px; width: 100%; }
+    .btn-status { flex: 1; padding: 4px 2px; font-size: 0.75rem; font-weight: bold; border: 1px solid var(--border); background: white; border-radius: 4px; cursor: pointer; }
+    .btn-status.dns-active { background: var(--dns-color); color: white; border-color: var(--dns-color); }
+    .btn-status.dsq-active { background: var(--dsq-color); color: white; border-color: var(--dsq-color); }
+
+    .badge-status { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; color: white; margin-left: 6px; }
+    .badge-final { background-color: var(--badge-final); }
+    .badge-bfinal { background-color: var(--badge-bfinal); }
+    .badge-swimoff { background-color: var(--badge-swimoff); }
+
+    .modal-backdrop { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+    .modal-content { background: white; padding: 20px; border-radius: 8px; width: 90%; max-width: 480px; }
+    .modal-title { font-weight: bold; font-size: 1.1rem; margin-bottom: 12px; }
+    .modal-select-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; max-height: 220px; overflow-y: auto; }
+    .modal-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border: 1px solid var(--border); border-radius: 4px; }
+    
+    .manual-time-box { background: #f1f5f9; padding: 12px; border-radius: 6px; margin-bottom: 16px; }
+    .manual-time-box label { font-size: 0.8rem; font-weight: bold; color: var(--text-muted); display: block; margin-bottom: 6px; }
+    .time-inputs { display: flex; gap: 6px; align-items: center; }
+    .time-inputs input { width: 55px; padding: 6px; font-size: 0.95rem; text-align: center; border: 1px solid var(--border); border-radius: 4px; }
+
+    .table-container { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    th { background: #f1f5f9; font-weight: bold; }
+    .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+    .status-badge-dns { color: var(--dns-color); font-weight: bold; }
+    .status-badge-dsq { color: var(--dsq-color); font-weight: bold; }
+
+    .view-switcher { display: flex; gap: 8px; }
+    .view-panel { display: none; }
+    .view-panel.active { display: block; }
+  </style>
+</head>
+<body>
+
+  <h1>🏊 水泳記録会 タイム計測システム</h1>
+
+  <div class="card">
+    <div class="card-title">競技情報設定</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="progNo">プログラムNo.</label>
+        <input type="number" id="progNo" value="1" min="1">
+      </div>
+      <div class="form-group">
+        <label for="roundType">種別 (ラウンド)</label>
+        <select id="roundType">
+          <option value="予選">予選</option>
+          <option value="B決勝">B決勝</option>
+          <option value="決勝">決勝</option>
+          <option value="スイムオフ">スイムオフ</option>
+          <option value="タイム決勝">タイム決勝</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="gender">性別</label>
+        <select id="gender">
+          <option value="女子">女子</option>
+          <option value="男子">男子</option>
+          <option value="混合">混合</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="distance">距離</label>
+        <select id="distance" onchange="calculateLaps()">
+          <option value="50">50m</option>
+          <option value="100">100m</option>
+          <option value="200">200m</option>
+          <option value="400">400m</option>
+          <option value="800">800m</option>
+          <option value="1500">1500m</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="lapInterval">ラップ単位</label>
+        <select id="lapInterval" onchange="calculateLaps()">
+          <option value="50">50mごと</option>
+          <option value="25">25mごと</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="style">種目</label>
+        <select id="style">
+          <option value="自由形">自由形</option>
+          <option value="背泳ぎ">背泳ぎ</option>
+          <option value="平泳ぎ">平泳ぎ</option>
+          <option value="バタフライ">バタフライ</option>
+          <option value="個人メドレー">個人メドレー</option>
+          <option value="フリーリレー">フリーリレー</option>
+          <option value="メドレーリレー">メドレーリレー</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="heatNo">組</label>
+        <input type="number" id="heatNo" value="1" min="1">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="timer-container">
+      <div class="timer-display" id="timerDisplay">00:00.00</div>
+      <div class="controls">
+        <button class="btn btn-start" id="startBtn">スタート <kbd>Shift</kbd>+<kbd>S</kbd></button>
+        <button class="btn btn-confirm" id="confirmBtn">記録を確定・蓄積 <kbd>Ctrl</kbd>+<kbd>Enter</kbd></button>
+        <button class="btn btn-reset" id="resetBtn">リセット</button>
+      </div>
+      <div class="shortcut-info">
+        ※ キーボード操作: ラップ・ゴール = <kbd>0</kbd>〜<kbd>9</kbd> ｜ 棄権(DNS) = <kbd>d</kbd> + <kbd>0</kbd>〜<kbd>9</kbd> ｜ 失格(DSQ) = <kbd>q</kbd> + <kbd>0</kbd>〜<kbd>9</kbd>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title" id="laneTitle">レーン別計測 (0〜9レーン)</div>
+    <div class="lanes-grid" id="lanesContainer"></div>
+  </div>
+
+  <div class="card">
+    <div class="table-header">
+      <div class="view-switcher">
+        <button class="btn btn-tab active" id="tabRawBtn" onclick="switchView('raw')">全記録一覧</button>
+        <button class="btn btn-tab" id="tabStartlistBtn" onclick="switchView('startlist')">スタートリスト形式</button>
+        <button class="btn btn-tab" id="tabRankingBtn" onclick="switchView('ranking')">ランキング形式</button>
+      </div>
+      <div>
+        <button class="btn btn-confirm" id="exportBtn" style="padding:6px 12px; font-size:0.85rem;">CSVダウンロード</button>
+        <button class="btn btn-danger" id="clearHistoryBtn" style="padding:6px 12px; font-size:0.85rem;">履歴消去</button>
+      </div>
+    </div>
+
+    <div id="viewRaw" class="view-panel active">
+      <div class="table-container">
+        <table id="historyTable">
+          <thead>
+            <tr>
+              <th>No</th>
+              <th>種別</th>
+              <th>性別</th>
+              <th>距離</th>
+              <th>種目</th>
+              <th>組</th>
+              <th>0レーン</th>
+              <th>1レーン</th>
+              <th>2レーン</th>
+              <th>3レーン</th>
+              <th>4レーン</th>
+              <th>5レーン</th>
+              <th>6レーン</th>
+              <th>7レーン</th>
+              <th>8レーン</th>
+              <th>9レーン</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="viewStartlist" class="view-panel">
+      <div class="table-container">
+        <table id="startlistTable">
+          <thead>
+            <tr>
+              <th>No</th>
+              <th>種別</th>
+              <th>種目名</th>
+              <th>組</th>
+              <th>レーン</th>
+              <th>ステータス / 確定タイム</th>
+              <th>備考・進出情報</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="viewRanking" class="view-panel">
+      <div class="table-container">
+        <table id="rankingTable">
+          <thead>
+            <tr>
+              <th>No.</th>
+              <th>種別</th>
+              <th>種目名</th>
+              <th>順位</th>
+              <th>組</th>
+              <th>レーン</th>
+              <th>記録</th>
+              <th>進出ステータス</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="modal-backdrop" id="fixModal">
+    <div class="modal-content">
+      <div class="modal-title" id="modalTitle">タイム補正・削除・ゴール手入力</div>
+
+      <div class="manual-time-box">
+        <label>🏁 最終ゴールタイムを直接設定/手入力</label>
+        <div class="time-inputs">
+          <input type="number" id="manualMin" placeholder="分" min="0" value="0"> 分
+          <input type="number" id="manualSec" placeholder="秒" min="0" max="59" value="00"> 秒
+          <input type="number" id="manualMs" placeholder="100分" min="0" max="99" value="00">
+          <button class="btn btn-confirm" style="padding:6px 10px; font-size:0.8rem;" onclick="applyManualGoalTime()">適用</button>
+        </div>
+      </div>
+
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px; font-weight:bold;">
+        中間ラップの欠落補正 / 誤操作削除:
+      </p>
+      <div class="modal-select-list" id="modalList"></div>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button class="btn btn-reset" style="padding:6px 12px; font-size:0.85rem;" onclick="closeFixModal()">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let startTime = null;
+    let timerInterval = null;
+    let isRunning = false;
+    let targetLaps = 1;
+
+    let laneData = Array(10).fill(null).map(() => ({
+      rawTimestamps: [],
+      missingIndices: [],
+      manualGoalTime: null,
+      status: 'NORMAL'
+    }));
+    let historyData = [];
+    let currentEditingLane = null;
+
+    const timerDisplay = document.getElementById('timerDisplay');
+    const startBtn = document.getElementById('startBtn');
+    const confirmBtn = document.getElementById('confirmBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const lanesContainer = document.getElementById('lanesContainer');
+    const historyTableBody = document.querySelector('#historyTable tbody');
+    const exportBtn = document.getElementById('exportBtn');
+    const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+
+    const progNoInput = document.getElementById('progNo');
+    const roundTypeSelect = document.getElementById('roundType');
+    const genderSelect = document.getElementById('gender');
+    const distanceSelect = document.getElementById('distance');
+    const lapIntervalSelect = document.getElementById('lapInterval');
+    const styleSelect = document.getElementById('style');
+    const heatNoInput = document.getElementById('heatNo');
+
+    function truncateToHundredths(ms) {
+      if (ms === null || ms === undefined || typeof ms !== 'number') return ms;
+      return Math.floor(ms / 10) * 10;
+    }
+
+    function calculateLaps() {
+      const dist = parseInt(distanceSelect.value, 10);
+      const interval = parseInt(lapIntervalSelect.value, 10);
+      targetLaps = Math.max(1, Math.ceil(dist / interval));
+      document.getElementById('laneTitle').textContent = `レーン別計測 (全${targetLaps}ラップ / 計測単位:${interval}m)`;
+    }
+
+    function initLanes() {
+      lanesContainer.innerHTML = '';
+      for (let i = 0; i < 10; i++) {
+        const laneBox = document.createElement('div');
+        laneBox.className = 'lane-box';
+        laneBox.id = `lane-box-${i}`;
+        laneBox.innerHTML = `
+          <div class="lane-header">
+            <span class="lane-number">${i} レーン</span>
+            <span class="lane-progress" id="lane-progress-${i}">0 / ${targetLaps}</span>
+          </div>
+          <div class="lane-time" id="lane-time-${i}">--:--.--</div>
+          <div class="lap-history-mini" id="lap-history-${i}">ラップ履歴なし</div>
+          <button class="btn-lane" onclick="recordLaneTime(${i})">タッチ / 記録 (キー:${i})</button>
+          <div class="lane-action-btns">
+            <button class="btn-sub" onclick="openFixModal(${i})">🛠 補正・手入力</button>
+          </div>
+          <div class="lane-status-btns">
+            <button class="btn-status" id="dns-btn-${i}" onclick="toggleStatus(${i}, 'DNS')">DNS</button>
+            <button class="btn-status" id="dsq-btn-${i}" onclick="toggleStatus(${i}, 'DSQ')">DSQ</button>
+          </div>
+        `;
+        lanesContainer.appendChild(laneBox);
+      }
+    }
+
+    function formatTime(ms) {
+      if (ms === null || ms === undefined) return '--:--.--';
+      if (ms === 'SKIP') return '[欠落]';
+      const cleanMs = truncateToHundredths(ms);
+      const minutes = Math.floor(cleanMs / 60000);
+      const seconds = Math.floor((cleanMs % 60000) / 1000);
+      const hundredths = Math.floor((cleanMs % 1000) / 10);
+
+      const mm = String(minutes).padStart(2, '0');
+      const ss = String(seconds).padStart(2, '0');
+      const hh = String(hundredths).padStart(2, '0');
+
+      return `${mm}:${ss}.${hh}`;
+    }
+
+    function getProcessedLaps(lane) {
+      let result = [];
+      let timeIdx = 0;
+      let totalSlots = Math.max(targetLaps, lane.rawTimestamps.length + lane.missingIndices.length);
+
+      for (let slot = 0; slot < totalSlots; slot++) {
+        if (lane.missingIndices.includes(slot)) {
+          result.push('SKIP');
+        } else {
+          if (timeIdx < lane.rawTimestamps.length) {
+            result.push({ rawIndex: timeIdx, time: truncateToHundredths(lane.rawTimestamps[timeIdx]) });
+            timeIdx++;
+          }
+        }
+      }
+
+      if (lane.manualGoalTime !== null) {
+        const cleanManual = truncateToHundredths(lane.manualGoalTime);
+        if (result.length < targetLaps) {
+          while (result.length < targetLaps - 1) {
+            result.push('SKIP');
+          }
+          result.push({ rawIndex: null, time: cleanManual });
+        } else {
+          result[targetLaps - 1] = { rawIndex: null, time: cleanManual };
+        }
+      }
+
+      return result;
+    }
+
+    function updateTimer() {
+      const now = Date.now();
+      timerDisplay.textContent = formatTime(now - startTime);
+    }
+
+    function startTimer() {
+      if (isRunning) return;
+      calculateLaps();
+      startTime = Date.now();
+      isRunning = true;
+      timerInterval = setInterval(updateTimer, 10);
+      startBtn.disabled = true;
+    }
+
+    function recordLaneTime(i) {
+      if (!isRunning) return;
+      const data = laneData[i];
+      if (data.status === 'DNS') return;
+
+      const elapsed = truncateToHundredths(Date.now() - startTime);
+      data.rawTimestamps.push(elapsed);
+      updateLaneUI(i);
+    }
+
+    function toggleStatus(i, targetStatus) {
+      const data = laneData[i];
+      data.status = (data.status === targetStatus) ? 'NORMAL' : targetStatus;
+      updateLaneUI(i);
+    }
+
+    function updateLaneUI(i) {
+      const box = document.getElementById(`lane-box-${i}`);
+      const timeDisplay = document.getElementById(`lane-time-${i}`);
+      const progressDisplay = document.getElementById(`lane-progress-${i}`);
+      const historyDisplay = document.getElementById(`lap-history-${i}`);
+      const dnsBtn = document.getElementById(`dns-btn-${i}`);
+      const dsqBtn = document.getElementById(`dsq-btn-${i}`);
+
+      const data = laneData[i];
+      const processedLaps = getProcessedLaps(data);
+
+      box.classList.remove('finished', 'status-dns', 'status-dsq');
+      timeDisplay.classList.remove('status-dns-text', 'status-dsq-text');
+      dnsBtn.classList.remove('dns-active');
+      dsqBtn.classList.remove('dsq-active');
+
+      progressDisplay.textContent = `${processedLaps.length} / ${targetLaps}`;
+
+      if (processedLaps.length > 0) {
+        const interval = parseInt(lapIntervalSelect.value, 10);
+        historyDisplay.innerHTML = processedLaps.map((item, idx) => {
+          const distLabel = (idx + 1) * interval;
+          const tVal = (typeof item === 'object') ? item.time : item;
+          const isManual = (idx === targetLaps - 1 && data.manualGoalTime !== null);
+          return `Lap${idx+1}(${distLabel}m): ${formatTime(tVal)}${isManual ? ' [手入力]' : ''}`;
+        }).join('<br>');
+      } else {
+        historyDisplay.textContent = 'ラップ履歴なし';
+      }
+
+      if (data.status === 'DNS') {
+        box.classList.add('status-dns');
+        timeDisplay.textContent = 'DNS';
+        timeDisplay.classList.add('status-dns-text');
+        dnsBtn.classList.add('dns-active');
+      } else if (data.status === 'DSQ') {
+        box.classList.add('status-dsq');
+        timeDisplay.textContent = 'DSQ';
+        timeDisplay.classList.add('status-dsq-text');
+        dsqBtn.classList.add('dsq-active');
+      } else {
+        const lastItem = processedLaps[processedLaps.length - 1];
+        const lastTime = (typeof lastItem === 'object') ? lastItem.time : lastItem;
+        timeDisplay.textContent = formatTime(lastTime);
+        if (processedLaps.length >= targetLaps) {
+          box.classList.add('finished');
+        }
+      }
+    }
+
+    function openFixModal(laneIndex) {
+      currentEditingLane = laneIndex;
+      document.getElementById('modalTitle').textContent = `${laneIndex}レーン 補正・削除・手入力`;
+
+      const data = laneData[laneIndex];
+      if (data.manualGoalTime !== null) {
+        const msTotal = truncateToHundredths(data.manualGoalTime);
+        document.getElementById('manualMin').value = Math.floor(msTotal / 60000);
+        document.getElementById('manualSec').value = Math.floor((msTotal % 60000) / 1000);
+        document.getElementById('manualMs').value = Math.floor((msTotal % 1000) / 10);
+      } else {
+        document.getElementById('manualMin').value = 0;
+        document.getElementById('manualSec').value = 0;
+        document.getElementById('manualMs').value = 0;
+      }
+
+      renderModalList();
+      document.getElementById('fixModal').style.display = 'flex';
+    }
+
+    function closeFixModal() {
+      document.getElementById('fixModal').style.display = 'none';
+      currentEditingLane = null;
+    }
+
+    function applyManualGoalTime() {
+      const min = parseInt(document.getElementById('manualMin').value || 0, 10);
+      const sec = parseInt(document.getElementById('manualSec').value || 0, 10);
+      const ms = parseInt(document.getElementById('manualMs').value || 0, 10);
+
+      const totalMs = truncateToHundredths((min * 60 * 1000) + (sec * 1000) + (ms * 10));
+      laneData[currentEditingLane].manualGoalTime = totalMs;
+
+      updateLaneUI(currentEditingLane);
+      renderModalList();
+      alert(`${currentEditingLane}レーンのゴールタイムを ${formatTime(totalMs)} に設定しました。`);
+    }
+
+    function renderModalList() {
+      const listEl = document.getElementById('modalList');
+      listEl.innerHTML = '';
+      const data = laneData[currentEditingLane];
+      const processedLaps = getProcessedLaps(data);
+      const interval = parseInt(lapIntervalSelect.value, 10);
+
+      const displayCount = Math.max(targetLaps, processedLaps.length + 1);
+
+      for (let slot = 0; slot < displayCount; slot++) {
+        const distLabel = (slot + 1) * interval;
+        const itemObj = processedLaps[slot];
+        const isMissing = data.missingIndices.includes(slot);
+
+        let timeStr = '--:--.--';
+        let rawIdx = null;
+
+        if (itemObj) {
+          if (itemObj === 'SKIP') {
+            timeStr = '[欠落]';
+          } else {
+            timeStr = formatTime(itemObj.time);
+            rawIdx = itemObj.rawIndex;
+          }
+        }
+
+        const item = document.createElement('div');
+        item.className = 'modal-item';
+        item.innerHTML = `
+          <div>
+            <strong>Lap ${slot+1} (${distLabel}m)</strong>: 
+            <span>${timeStr}</span>
+          </div>
+          <div style="display:flex; gap:4px;">
+            ${isMissing ? 
+              `<button class="btn btn-danger" style="padding:4px 8px; font-size:0.75rem;" onclick="removeMissingSlot(${slot})">欠落解除</button>` : 
+              `<button class="btn btn-confirm" style="padding:4px 8px; font-size:0.75rem;" onclick="insertMissingSlot(${slot})">欠落挿入</button>`
+            }
+            ${rawIdx !== null ? 
+              `<button class="btn btn-danger" style="padding:4px 8px; font-size:0.75rem;" onclick="deleteRawTimestamp(${rawIdx})">削除</button>` : ''
+            }
+          </div>
+        `;
+        listEl.appendChild(item);
+      }
+    }
+
+    function deleteRawTimestamp(rawIdx) {
+      const data = laneData[currentEditingLane];
+      data.rawTimestamps.splice(rawIdx, 1);
+      renderModalList();
+      updateLaneUI(currentEditingLane);
+    }
+
+    function insertMissingSlot(slotIndex) {
+      const data = laneData[currentEditingLane];
+      if (!data.missingIndices.includes(slotIndex)) {
+        data.missingIndices.push(slotIndex);
+        data.missingIndices.sort((a,b) => a - b);
+      }
+      renderModalList();
+      updateLaneUI(currentEditingLane);
+    }
+
+    function removeMissingSlot(slotIndex) {
+      const data = laneData[currentEditingLane];
+      data.missingIndices = data.missingIndices.filter(idx => idx !== slotIndex);
+      renderModalList();
+      updateLaneUI(currentEditingLane);
+    }
+
+    function resetTimer() {
+      clearInterval(timerInterval);
+      isRunning = false;
+      startTime = null;
+      timerDisplay.textContent = '00:00.00';
+      startBtn.disabled = false;
+
+      calculateLaps();
+      laneData = Array(10).fill(null).map(() => ({ rawTimestamps: [], missingIndices: [], manualGoalTime: null, status: 'NORMAL' }));
+      for (let i = 0; i < 10; i++) {
+        updateLaneUI(i);
+      }
+    }
+
+    function confirmHeat() {
+      const record = {
+        progNo: progNoInput.value,
+        roundType: roundTypeSelect.value,
+        gender: genderSelect.value,
+        distance: `${distanceSelect.value}m`,
+        style: styleSelect.value,
+        heatNo: heatNoInput.value,
+        laneDetails: laneData.map((lane, idx) => {
+          if (lane.status === 'DNS') return { lane: idx, status: 'DNS', totalMs: Infinity, display: 'DNS', detail: 'DNS' };
+          if (lane.status === 'DSQ') return { lane: idx, status: 'DSQ', totalMs: Infinity, display: 'DSQ', detail: 'DSQ' };
+
+          const processedLaps = getProcessedLaps(lane);
+          if (processedLaps.length === 0) return { lane: idx, status: 'NONE', totalMs: Infinity, display: '--:--.--', detail: '--:--.--' };
+
+          const lastItem = processedLaps[processedLaps.length - 1];
+          const lastTime = (typeof lastItem === 'object') ? truncateToHundredths(lastItem.time) : null;
+          const totalStr = formatTime(lastTime);
+          const lapDetails = processedLaps.map(item => {
+            const t = (typeof item === 'object') ? truncateToHundredths(item.time) : item;
+            return formatTime(t);
+          }).join(' | ');
+
+          return {
+            lane: idx,
+            status: 'OK',
+            totalMs: lastTime !== null ? lastTime : Infinity,
+            display: totalStr,
+            detail: `${totalStr} [${lapDetails}]`
+          };
+        })
+      };
+
+      historyData.push(record);
+      renderAllViews();
+
+      heatNoInput.value = parseInt(heatNoInput.value, 10) + 1;
+      resetTimer();
+    }
+
+    function switchView(viewType) {
+      document.querySelectorAll('.btn-tab').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.view-panel').forEach(panel => panel.classList.remove('active'));
+
+      if (viewType === 'raw') {
+        document.getElementById('tabRawBtn').classList.add('active');
+        document.getElementById('viewRaw').classList.add('active');
+      } else if (viewType === 'startlist') {
+        document.getElementById('tabStartlistBtn').classList.add('active');
+        document.getElementById('viewStartlist').classList.add('active');
+      } else if (viewType === 'ranking') {
+        document.getElementById('tabRankingBtn').classList.add('active');
+        document.getElementById('viewRanking').classList.add('active');
+      }
+    }
+
+    function renderAllViews() {
+      renderRawTable();
+      renderStartlistTable();
+      renderRankingTable();
+    }
+
+    function renderRawTable() {
+      historyTableBody.innerHTML = '';
+      historyData.forEach((row) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${row.progNo}</td>
+          <td><strong>${row.roundType}</strong></td>
+          <td>${row.gender}</td>
+          <td>${row.distance}</td>
+          <td>${row.style}</td>
+          <td>${row.heatNo}</td>
+          ${row.laneDetails.map(l => {
+            let cls = '';
+            if (l.status === 'DNS') cls = 'class="status-badge-dns"';
+            if (l.status === 'DSQ') cls = 'class="status-badge-dsq"';
+            return `<td ${cls}>${l.detail}</td>`;
+          }).join('')}
+        `;
+        historyTableBody.appendChild(tr);
+      });
+    }
+
+    /* --- 進出判定および順位割り当てロジック関数 (改修版) --- */
+    function evaluateAdvancement(entries) {
+      let resultMap = new Map();
+
+      // 有効なタイム記録を持つエントリーのみソート
+      let validEntries = entries.filter(e => e.status === 'OK').sort((a,b) => a.totalMs - b.totalMs);
+      
+      // タイムごとにグループ化して同着判定
+      let timeGroups = [];
+      validEntries.forEach(item => {
+        let lastGroup = timeGroups[timeGroups.length - 1];
+        if (lastGroup && lastGroup.time === item.totalMs) {
+          lastGroup.items.push(item);
+        } else {
+          timeGroups.push({ time: item.totalMs, items: [item] });
+        }
+      });
+
+      let currentRank = 1;
+
+      timeGroups.forEach(group => {
+        let groupSize = group.items.length;
+        let startRank = currentRank;
+        let endRank = currentRank + groupSize - 1;
+
+        group.items.forEach(item => {
+          let advanceInfo = '';
+          let badgeClass = '';
+
+          // 予選イベントの場合のみ進出権/スイムオフのバッジを判定
+          if (item.roundType === '予選') {
+            if (endRank <= 8) {
+              advanceInfo = '決勝進出';
+              badgeClass = 'badge-final';
+            } else if (startRank <= 8 && endRank > 8) {
+              advanceInfo = 'スイムオフ発生(8位同着)';
+              badgeClass = 'badge-swimoff';
+            } else if (startRank >= 9 && endRank <= 16) {
+              advanceInfo = 'B決勝進出';
+              badgeClass = 'badge-bfinal';
+            } else if (startRank <= 16 && endRank > 16) {
+              advanceInfo = 'スイムオフ発生(16位同着)';
+              badgeClass = 'badge-swimoff';
+            }
+          }
+
+          resultMap.set(item.id, { advanceInfo, badgeClass, rank: startRank });
+        });
+
+        currentRank += groupSize;
+      });
+
+      return entries.map(e => {
+        if (resultMap.has(e.id)) {
+          const res = resultMap.get(e.id);
+          return { ...e, advanceInfo: res.advanceInfo, badgeClass: res.badgeClass, rank: res.rank };
+        } else {
+          return { ...e, advanceInfo: '', badgeClass: '', rank: '-' };
+        }
+      });
+    }
+
+    function renderStartlistTable() {
+      const tbody = document.querySelector('#startlistTable tbody');
+      tbody.innerHTML = '';
+
+      let groupedEvents = {};
+
+      historyData.forEach((row, rowIdx) => {
+        const eventKey = `Prog${row.progNo}_${row.gender}_${row.distance}_${row.style}`;
+        if (!groupedEvents[eventKey]) groupedEvents[eventKey] = [];
+
+        row.laneDetails.forEach(l => {
+          groupedEvents[eventKey].push({
+            id: `${rowIdx}_${l.lane}`,
+            progNo: row.progNo,
+            roundType: row.roundType,
+            eventName: `${row.gender} ${row.distance} ${row.style}`,
+            heatNo: row.heatNo,
+            lane: l.lane,
+            status: l.status,
+            totalMs: l.totalMs,
+            display: l.display
+          });
+        });
+      });
+
+      Object.keys(groupedEvents).forEach(eventKey => {
+        const entries = groupedEvents[eventKey];
+        const evaluatedEntries = evaluateAdvancement(entries);
+
+        evaluatedEntries.forEach(l => {
+          const tr = document.createElement('tr');
+          let cls = '';
+          if (l.status === 'DNS') cls = 'class="status-badge-dns"';
+          if (l.status === 'DSQ') cls = 'class="status-badge-dsq"';
+
+          let badgeHtml = l.advanceInfo ? `<span class="badge-status ${l.badgeClass}">${l.advanceInfo}</span>` : '';
+
+          tr.innerHTML = `
+            <td>No.${l.progNo}</td>
+            <td><strong>${l.roundType}</strong></td>
+            <td>${l.eventName}</td>
+            <td>第 ${l.heatNo} 組</td>
+            <td>${l.lane} レーン</td>
+            <td ${cls}>${l.display}</td>
+            <td>${badgeHtml}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      });
+    }
+
+    function renderRankingTable() {
+      const tbody = document.querySelector('#rankingTable tbody');
+      tbody.innerHTML = '';
+
+      let groupedEvents = {};
+
+      historyData.forEach((row, rowIdx) => {
+        // ラウンド種別ごとに分けてランキング集計
+        const eventKey = `Prog${row.progNo}_${row.roundType}_${row.gender}_${row.distance}_${row.style}`;
+        if (!groupedEvents[eventKey]) groupedEvents[eventKey] = [];
+
+        row.laneDetails.forEach(l => {
+          if (l.status !== 'NONE') {
+            groupedEvents[eventKey].push({
+              id: `${rowIdx}_${l.lane}`,
+              progNo: row.progNo,
+              roundType: row.roundType,
+              eventName: `${row.gender} ${row.distance} ${row.style}`,
+              heatNo: row.heatNo,
+              lane: l.lane,
+              status: l.status,
+              totalMs: l.totalMs,
+              display: l.display
+            });
+          }
+        });
+      });
+
+      Object.keys(groupedEvents).forEach(eventKey => {
+        const entries = groupedEvents[eventKey];
+        let evaluatedEntries = evaluateAdvancement(entries);
+
+        evaluatedEntries.sort((a,b) => a.totalMs - b.totalMs);
+
+        evaluatedEntries.forEach(entry => {
+          const tr = document.createElement('tr');
+          let cls = '';
+
+          if (entry.status === 'DNS') cls = 'class="status-badge-dns"';
+          if (entry.status === 'DSQ') cls = 'class="status-badge-dsq"';
+
+          let badgeHtml = entry.advanceInfo ? `<span class="badge-status ${entry.badgeClass}">${entry.advanceInfo}</span>` : '';
+
+          tr.innerHTML = `
+            <td>No.${entry.progNo}</td>
+            <td><strong>${entry.roundType}</strong></td>
+            <td>${entry.eventName}</td>
+            <td><strong>${entry.rank !== '-' ? entry.rank + ' 位' : '-'}</strong></td>
+            <td>第 ${entry.heatNo} 組</td>
+            <td>${entry.lane} レーン</td>
+            <td ${cls}>${entry.display}</td>
+            <td>${badgeHtml}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      });
+    }
+
+    function exportCSV() {
+      if (historyData.length === 0) {
+        alert('蓄積された記録がありません。');
+        return;
+      }
+
+      let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+      csvContent += "Prog,種別,性別,距離,種目,組,0レーン,1レーン,2レーン,3レーン,4レーン,5レーン,6レーン,7レーン,8レーン,9レーン\n";
+
+      historyData.forEach(row => {
+        const line = [
+          row.progNo,
+          row.roundType,
+          row.gender,
+          row.distance,
+          row.style,
+          row.heatNo,
+          ...row.laneDetails.map(l => `"${l.detail}"`)
+        ].join(",");
+        csvContent += line + "\n";
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `swimming_results_prog${progNoInput.value}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    let pressedKeys = {};
+    document.addEventListener('keydown', (e) => {
+      const activeTag = document.activeElement.tagName;
+      if (activeTag === 'INPUT' || activeTag === 'SELECT') return;
+
+      if (e.shiftKey && (e.key === 'S' || e.key === 's')) {
+        e.preventDefault();
+        startTimer();
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        confirmHeat();
+        return;
+      }
+
+      pressedKeys[e.key.toLowerCase()] = true;
+
+      if (pressedKeys['d']) {
+        for (let i = 0; i <= 9; i++) {
+          if (pressedKeys[i.toString()]) {
+            toggleStatus(i, 'DNS');
+            delete pressedKeys[i.toString()];
+            return;
+          }
+        }
+      }
+
+      if (pressedKeys['q']) {
+        for (let i = 0; i <= 9; i++) {
+          if (pressedKeys[i.toString()]) {
+            toggleStatus(i, 'DSQ');
+            delete pressedKeys[i.toString()];
+            return;
+          }
+        }
+      }
+
+      if (e.key >= '0' && e.key <= '9') {
+        e.preventDefault();
+        const laneNum = parseInt(e.key, 10);
+        recordLaneTime(laneNum);
+      }
+    });
+
+    document.addEventListener('keyup', (e) => {
+      delete pressedKeys[e.key.toLowerCase()];
+    });
+
+    startBtn.addEventListener('click', startTimer);
+    confirmBtn.addEventListener('click', confirmHeat);
+    resetBtn.addEventListener('click', resetTimer);
+    exportBtn.addEventListener('click', exportCSV);
+    clearHistoryBtn.addEventListener('click', () => {
+      if (confirm('蓄積された履歴を削除しますか？')) {
+        historyData = [];
+        renderAllViews();
+      }
+    });
+
+    calculateLaps();
+    initLanes();
+  </script>
+</body>
+</html>
